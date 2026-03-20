@@ -1,0 +1,96 @@
+# Random Forests Advanced Iris Analysis
+
+This Jupyter Notebook explores advanced machine learning techniques applied to the Iris dataset. We will enhance our analysis by incorporating hyperparameter tuning, comparing multiple algorithms, and performing cross-validation. Additionally, we will visualize crucial model metrics such as feature importance, confusion matrix heatmap, ROC curves, and precision-recall analysis. The goal is to provide deeper insights into the classification performance of different models.
+
+## Libraries Required
+```python
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, precision_recall_curve
+from sklearn.preprocessing import label_binarize
+
+# Load Iris dataset
+eris = load_iris()
+df = pd.DataFrame(data=eris.data, columns=eris.feature_names)
+df['target'] = eris.target
+
+
+# Visualize the dataset
+sns.pairplot(df, hue='target')
+plt.show()
+
+
+X = df.drop('target', axis=1)
+y = df['target']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+param_grid = {
+    'n_estimators': [50, 100, 200],
+    'max_depth': [None, 10, 20, 30],
+    'min_samples_split': [2, 5, 10]
+}
+rf = RandomForestClassifier(random_state=42)
+grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5)
+grid_search.fit(X_train, y_train)
+best_model = grid_search.best_estimator_
+
+cv_scores = cross_val_score(best_model, X_train, y_train, cv=10)
+print(f'Cross-Validation Scores: {cv_scores}')
+print(f'Mean CV Score: {cv_scores.mean()}')
+
+
+importances = best_model.feature_importances_
+features = X.columns
+indices = np.argsort(importances)[::-1]
+
+plt.figure()
+plt.title('Feature Importances')
+plt.bar(range(X.shape[1]), importances[indices], color='r', align='center')
+plt.xticks(range(X.shape[1]), features[indices], rotation=90)
+plt.xlim([-1, X.shape[1]])
+plt.show()
+
+# Make predictions and generate confusion matrix
+y_pred = best_model.predict(X_test)
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.ylabel('True label')
+plt.xlabel('Predicted label')
+plt.show()
+
+# Get predictions probabilities
+y_score = best_model.predict_proba(X_test)
+# Binarize the output for ROC calculation
+y_test_bin = label_binarize(y_test, classes=[0, 1, 2])
+n_classes = y_test_bin.shape[1]
+
+# ROC curve
+fpr, tpr, _ = roc_curve(y_test_bin.ravel(), y_score.ravel())
+roc_auc = auc(fpr, tpr)
+plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend(loc='lower right')
+plt.show()
+
+# You can compare this model with others as needed
+# For example, by building and fitting a Decision Tree Classifier
+from sklearn.tree import DecisionTreeClassifier
+
+# Decision Tree
+dt_model = DecisionTreeClassifier(random_state=42)
+dt_model.fit(X_train, y_train)
+y_dt_pred = dt_model.predict(X_test)
+
+# Print comparison metrics
+print(classification_report(y_test, y_dt_pred))
